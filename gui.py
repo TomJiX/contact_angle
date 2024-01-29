@@ -4,10 +4,7 @@ from PyQt5.QtCore import QEvent, Qt, pyqtSignal, QThread, QObject, QTimer
 from PyQt5.QtGui import QCloseEvent, QImage, QMouseEvent, QPixmap
 import PyQt5.QtWidgets as qt
 import numpy as np
-import datetime
 import selectinwindow_v2
-import ctypes
-import pygetwindow as gw
 import os
 
 class VideoCaptureWorker(QObject):

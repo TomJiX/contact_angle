@@ -4,8 +4,9 @@ from PyQt5.QtCore import QEvent, Qt, pyqtSignal, QThread, QObject, QTimer
 from PyQt5.QtGui import QCloseEvent, QImage, QMouseEvent, QPixmap
 import PyQt5.QtWidgets as qt
 import numpy as np
-import selectinwindow_v2
+import selectinwindow as selectinwindow
 import os
+from scipy import ndimage
 
 class VideoCaptureWorker(QObject):
     frame_ready = pyqtSignal(object)
@@ -109,6 +110,7 @@ class AnalysisApp(qt.QWidget):
     issue = pyqtSignal(str)
     def __init__(self):
         super().__init__()
+        self.scale_factor = 1
         self.a_final_layout = qt.QHBoxLayout(self)
         self.a_left_layout = qt.QVBoxLayout(self)
 
@@ -121,16 +123,53 @@ class AnalysisApp(qt.QWidget):
         self.left_angle_display = qt.QLabel("", self)
 
         # self.std_label = qt.QLabel("Standard Deviation", self)
-        # self.std_display = qt.QLabel("", self)
+        # self.std_display = qt.QLabel("", self) 
 
         self.mean_label = qt.QLabel("Mean", self)
         self.mean_display = qt.QLabel("", self)
         
+        self.correction_label = qt.QLabel("Correction", self)
+        self.correction_display = qt.QLineEdit("", self)
+
         self.image_label = qt.QLabel("Image to analyze path")
         self.image_entry = qt.QLineEdit()
         self.capture_button = qt.QPushButton("Capture Image", self)
 
+        layout = qt.QVBoxLayout()
 
+        self.canny1_label = qt.QLabel("Canny1")
+        self.canny1_entry = qt.QLineEdit()
+        self.canny1_entry.setText("50")
+        layout.addWidget(self.canny1_label)
+        layout.addWidget(self.canny1_entry)
+
+        self.canny2_label = qt.QLabel("Canny2")
+        self.canny2_entry = qt.QLineEdit()
+        self.canny2_entry.setText("150")
+        layout.addWidget(self.canny2_label)
+        layout.addWidget(self.canny2_entry)
+
+        self.blur_size_label = qt.QLabel("Blur Size")
+        self.blur_size_entry = qt.QLineEdit()
+        self.blur_size_entry.setText("7")
+        layout.addWidget(self.blur_size_label)
+        layout.addWidget(self.blur_size_entry)
+
+        self.aperture_size_label = qt.QLabel("Aperture Size")
+        self.aperture_size_entry = qt.QLineEdit()
+        self.aperture_size_entry.setText("3")
+        layout.addWidget(self.aperture_size_label)
+        layout.addWidget(self.aperture_size_entry)
+
+        self.L2gradient = qt.QCheckBox("L2gradient")
+        self.L2gradient.setChecked(True)
+        layout.addWidget(self.L2gradient)
+
+        self.update_param_button = qt.QPushButton("Update Parameters", self)
+        layout.addWidget(self.update_param_button)
+        self.update_param_button.clicked.connect(self.cv_param_changed)
+
+        self.a_left_layout.addLayout(layout)
         self.a_left_layout.addWidget(self.right_angle_label)
         self.a_left_layout.addWidget(self.right_angle_display)
         self.a_left_layout.addWidget(self.left_angle_label)
@@ -139,13 +178,15 @@ class AnalysisApp(qt.QWidget):
         # self.a_left_layout.addWidget(self.std_display)
         self.a_left_layout.addWidget(self.mean_label)
         self.a_left_layout.addWidget(self.mean_display)
+        self.a_left_layout.addWidget(self.correction_label)
+        self.a_left_layout.addWidget(self.correction_display)
         self.a_left_layout.addWidget(self.start_stop_button)
         self.a_left_layout.addWidget(self.image_label)
         self.a_left_layout.addWidget(self.image_entry)
         self.a_left_layout.addWidget(self.capture_button)
         
         self.a_right_layout = qt.QLabel(self)
-        sizePolicy = qt.QSizePolicy(qt.QSizePolicy.Preferred, qt.QSizePolicy.Expanding)
+        sizePolicy = qt.QSizePolicy(qt.QSizePolicy.Expanding, qt.QSizePolicy.Expanding)
         self.a_right_layout.setSizePolicy(sizePolicy)
         self.a_final_layout.addLayout(self.a_left_layout)
         self.a_final_layout.addWidget(self.a_right_layout,stretch=70)
@@ -153,6 +194,7 @@ class AnalysisApp(qt.QWidget):
         
         self.start_stop_button.clicked.connect(self.start_or_stop)
         self.capture_button.clicked.connect(self.capture_image)
+       
 
         self.angle_thread = QThread()
         self.wName="OpenCV Window"
@@ -165,20 +207,31 @@ class AnalysisApp(qt.QWidget):
         bytes_per_line = ch * w
         qt_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
         pixmap = QPixmap.fromImage(qt_image)
-        self.a_right_layout.setPixmap(pixmap)
+        
+        scaled_pixmap = pixmap.scaled(self.a_right_layout.size(), Qt.KeepAspectRatio)
+        self.scale_factor = self.a_right_layout.width() / w
+
+        self.rectI.keepWithin.w = int(self.a_right_layout.width()/self.scale_factor)
+        self.rectI.keepWithin.h = int(self.a_right_layout.height()/self.scale_factor)
+        
+        self.a_right_layout.setPixmap(scaled_pixmap)
         self.a_right_layout.setAlignment(Qt.AlignTop | Qt.AlignLeft)
     def start_analysis(self):
         print("start analysis")
         image_path=self.image_entry.text()
+        image_path=image_path.replace('"', '')
         if image_path=="":
             self.issue.emit("Please enter a valid image path")
             return
         self.image=cv2.imread(image_path)
-        self.rectI=selectinwindow_v2.DragRectangle(self.image, self.wName, self.image.shape[0], self.image.shape[1])
+        
+        self.rectI=selectinwindow.DragRectangle(self.image, self.wName, self.image.shape[0], self.image.shape[1])
     
         self.rectI.new_angle.connect(self.update_angles)
         self.rectI.new_frame.connect(self.update_frame)
         self.rectI.sig.connect(self.print_event)
+        self.correction_display.textChanged.connect(self.correction_changed)
+        self.correction_display.setText("0")
         self.event = self.event
         self.update_frame(self.rectI.image)
     
@@ -189,8 +242,10 @@ class AnalysisApp(qt.QWidget):
     def event(self, event):
         if event.type() in (QEvent.MouseButtonPress, QEvent.MouseButtonRelease, QEvent.MouseMove):
             x,y=event.x()-self.a_right_layout.geometry().x(),event.y()-self.a_right_layout.geometry().y()
+            x = int(x/self.scale_factor)
+            y = int(y/self.scale_factor)
             if self.rectI is not None:
-                selectinwindow_v2.dragrect(event,x,y, self.rectI)
+                selectinwindow.dragrect(event,x,y, self.rectI)
             return super().event(event)
         return super().event(event)
     def stop_analysis(self):
@@ -207,6 +262,26 @@ class AnalysisApp(qt.QWidget):
             self.stop_analysis()
             self.start_stop_button.setText("Analyze")
 
+    def correction_changed(self):
+        if self.correction_display.text() not in ["","-"]:
+            new_im=ndimage.rotate(self.image,float(self.correction_display.text()))
+            width, height,_ = new_im.shape   # Get dimensions
+            left = int((width - self.rectI.keepWithin.w)/2)
+            top = int((height - self.rectI.keepWithin.h)/2)
+            right = int((width + self.rectI.keepWithin.w)/2)
+            bottom = int((height + self.rectI.keepWithin.h)/2)
+            # Crop the center of the image
+            new_im = new_im[left:right,top:bottom] 
+            self.rectI.image=new_im
+
+    def cv_param_changed(self):
+        if self.rectI is not None:
+            self.rectI.canny1=int(self.canny1_entry.text())
+            self.rectI.canny2=int(self.canny2_entry.text())
+            self.rectI.blur_size=int(self.blur_size_entry.text())
+            self.rectI.apertureSize=int(self.aperture_size_entry.text())
+            self.rectI.L2gradient=self.L2gradient.isChecked()
+            
     def handle_tab_change(self, index):
         if index == 0 :
             self.stop_analysis()

@@ -5,17 +5,15 @@ def calculate_angle_v2(x, y, ellipse):
     h, k = ellipse[0]
     a, b = max(ellipse[1]) / 2,min(ellipse[1]) / 2
     phi = np.radians(90-ellipse[2])
-    #print(ellipse[2])
-    numerator = (x-h)*(b*np.cos(phi))**2+(a*np.sin(phi))**2
-    denominator = (y-k)*(a*np.cos(phi))**2-(b*np.sin(phi))**2
 
-    slope_tangent=numerator/denominator
-    angle = np.abs(np.degrees(np.arctan(slope_tangent)))
-    if y>k:
-      angle+=90
-
-    # if angle<0 :
-    #   angle += 180
+    numerator = (x - h) * np.cos(phi) + (y - k) * np.sin(phi)
+    denominator = (x - h) * np.sin(phi) - (y - k) * np.cos(phi)
+    slope_tangent = -numerator / denominator * (b**2 / a**2)
+    angle =np.degrees(np.arctan(slope_tangent))
+    if angle < 0:
+        angle += 180
+    if x>h:
+        angle = 180-angle
     return angle
 
 def find_contact_angle(image,rectI):
@@ -24,10 +22,10 @@ def find_contact_angle(image,rectI):
     crop_img=image[rectI.outRect.y:rectI.outRect.y+rectI.outRect.h,rectI.outRect.x:rectI.outRect.x+rectI.outRect.w]
     gray = cv2.cvtColor(crop_img, cv2.COLOR_BGR2GRAY)
     # Apply GaussianBlur to reduce noise and improve edge detection
-    blurred = cv2.GaussianBlur(gray, (7, 7), 0)
+    blurred = cv2.GaussianBlur(gray, (rectI.blur_size, rectI.blur_size), 0)
 
     # Use Canny edge detector to find edges
-    edges = cv2.Canny(blurred, 50, 150)
+    edges = cv2.Canny(blurred, rectI.canny1, rectI.canny2,apertureSize=rectI.apertureSize,L2gradient=rectI.L2gradient)
     #cv2_imshow(edges)
     # Find contours in the edges
     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -36,7 +34,7 @@ def find_contact_angle(image,rectI):
     largest_contour = max(contours, key=lambda x: cv2.arcLength(x, closed=True))
     ellipse = cv2.fitEllipse(largest_contour)
 
-    #cv2.ellipse(crop_img, ellipse, (255, 255, 0), 2)
+    cv2.ellipse(crop_img, ellipse, (255, 255, 0), 2)
     cv2.drawContours(crop_img, [largest_contour], 0, (0,255,0), 3)
     left_of_center = np.array([point for point in largest_contour[:, 0] if point[0] < crop_img.shape[1]/2])
     bottom_most_left = max(left_of_center, key=lambda x: x[1])

@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 import cv2
-import analyze_one_img
+import analyze_one_img as analyze_one_img
 from PyQt5.QtCore import  pyqtSignal, QObject,Qt,QEvent
 import numpy as np
 from timeit import default_timer as timer
@@ -52,10 +52,9 @@ class DragRectangle(QObject):
     # the anchor point to the top-left and the bottom-right corner
     anchor = Rect()
     # Selection marker size
-    sBlk = 4
+    sBlk = 10
     # Whether initialized or not
     initialized = False
-
     # Image
     image = None
 
@@ -84,12 +83,21 @@ class DragRectangle(QObject):
     def __init__(self, Img, windowName, windowWidth, windowHeight):
         # Image
         super().__init__()
+        self.og_img = Img
         self.image = Img
         self.tmp = Img.copy()
+
         self.a_l = None
         self.a_r = None
         # Window name
         self.wname = windowName
+
+        # Opencv options
+        self.canny1 = 50
+        self.canny2 = 150
+        self.blur_size = 7
+        self.apertureSize = 3 
+        self.L2gradient = False
 
         # Limit the selection box to the canvas
         self.keepWithin.x = 0
@@ -316,7 +324,7 @@ def clearCanvasNDraw(dragObj):
         pass
     cv2.rectangle(tmp, (dragObj.outRect.x, dragObj.outRect.y),
                   (dragObj.outRect.x + dragObj.outRect.w,
-                   dragObj.outRect.y + dragObj.outRect.h), (0, 255, 0), 2)
+                   dragObj.outRect.y + dragObj.outRect.h), (0, 255, 0), 10)
     drawSelectMarkers(tmp, dragObj)
     dragObj.tmp=tmp
     dragObj.new_frame.emit(tmp)
@@ -329,52 +337,53 @@ def drawSelectMarkers(image, dragObj):
     """
     Draw markers on the dragged rectangle
     """
+    line_width=10
     # Top-Left
     cv2.rectangle(image, (dragObj.outRect.x - dragObj.sBlk,
                           dragObj.outRect.y - dragObj.sBlk),
                   (dragObj.outRect.x - dragObj.sBlk + dragObj.sBlk * 2,
                    dragObj.outRect.y - dragObj.sBlk + dragObj.sBlk * 2),
-                  (0, 255, 0), 2)
+                  (0, 255, 0), line_width)
     # Top-Rigth
     cv2.rectangle(image, (dragObj.outRect.x + dragObj.outRect.w - dragObj.sBlk,
                           dragObj.outRect.y - dragObj.sBlk),
                   (dragObj.outRect.x + dragObj.outRect.w - dragObj.sBlk + dragObj.sBlk * 2,
                    dragObj.outRect.y - dragObj.sBlk + dragObj.sBlk * 2),
-                  (0, 255, 0), 2)
+                  (0, 255, 0), line_width)
     # Bottom-Left
     cv2.rectangle(image, (dragObj.outRect.x - dragObj.sBlk,
                           dragObj.outRect.y + dragObj.outRect.h - dragObj.sBlk),
                   (dragObj.outRect.x - dragObj.sBlk + dragObj.sBlk * 2,
                    dragObj.outRect.y + dragObj.outRect.h - dragObj.sBlk + dragObj.sBlk * 2),
-                  (0, 255, 0), 2)
+                  (0, 255, 0), line_width)
     # Bottom-Right
     cv2.rectangle(image, (dragObj.outRect.x + dragObj.outRect.w - dragObj.sBlk,
                           dragObj.outRect.y + dragObj.outRect.h - dragObj.sBlk),
                   (dragObj.outRect.x + dragObj.outRect.w - dragObj.sBlk + dragObj.sBlk * 2,
                    dragObj.outRect.y + dragObj.outRect.h - dragObj.sBlk + dragObj.sBlk * 2),
-                  (0, 255, 0), 2)
+                  (0, 255, 0), line_width)
 
     # Top-Mid
     cv2.rectangle(image, (dragObj.outRect.x + int(dragObj.outRect.w / 2) - dragObj.sBlk,
                           dragObj.outRect.y - dragObj.sBlk),
                   (dragObj.outRect.x + int(dragObj.outRect.w / 2) - dragObj.sBlk + dragObj.sBlk * 2,
                    dragObj.outRect.y - dragObj.sBlk + dragObj.sBlk * 2),
-                  (0, 255, 0), 2)
+                  (0, 255, 0), line_width)
     # Bottom-Mid
     cv2.rectangle(image, (dragObj.outRect.x + int(dragObj.outRect.w / 2) - dragObj.sBlk,
                           dragObj.outRect.y + dragObj.outRect.h - dragObj.sBlk),
                   (dragObj.outRect.x + int(dragObj.outRect.w / 2) - dragObj.sBlk + dragObj.sBlk * 2,
                    dragObj.outRect.y + dragObj.outRect.h - dragObj.sBlk + dragObj.sBlk * 2),
-                  (0, 255, 0), 2)
+                  (0, 255, 0), line_width)
     # Left-Mid
     cv2.rectangle(image, (dragObj.outRect.x - dragObj.sBlk,
                           dragObj.outRect.y + int(dragObj.outRect.h / 2) - dragObj.sBlk),
                   (dragObj.outRect.x - dragObj.sBlk + dragObj.sBlk * 2,
                    dragObj.outRect.y + int(dragObj.outRect.h / 2) - dragObj.sBlk + dragObj.sBlk * 2),
-                  (0, 255, 0), 2)
+                  (0, 255, 0), line_width)
     # Right-Mid
     cv2.rectangle(image, (dragObj.outRect.x + dragObj.outRect.w - dragObj.sBlk,
                           dragObj.outRect.y + int(dragObj.outRect.h / 2) - dragObj.sBlk),
                   (dragObj.outRect.x + dragObj.outRect.w - dragObj.sBlk + dragObj.sBlk * 2,
                    dragObj.outRect.y + int(dragObj.outRect.h / 2) - dragObj.sBlk + dragObj.sBlk * 2),
-                  (0, 255, 0), 2)
+                  (0, 255, 0), line_width)

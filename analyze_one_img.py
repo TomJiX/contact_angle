@@ -88,8 +88,6 @@ def find_contact_angle(image, rectI):
     
     contours_inside_crop, _ = cv2.findContours(edges_crop, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     largest_contour = max(contours_inside_crop, key=lambda x: cv2.arcLength(x, closed=True))
-
-    print("new loop")
     ellipse,c = find_best_ellipse(largest_contour)
     cv2.ellipse(crop_img, ellipse, (255, 255, 0), 2 * scale_features)
     cv2.drawContours(crop_img, [c], -1, (0, 255, 0), 5)

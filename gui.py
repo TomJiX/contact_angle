@@ -137,17 +137,23 @@ class AnalysisApp(qt.QWidget):
 
         layout = qt.QVBoxLayout()
 
-        self.canny1_label = qt.QLabel("Canny1")
-        self.canny1_entry = qt.QLineEdit()
-        self.canny1_entry.setText("50")
-        layout.addWidget(self.canny1_label)
-        layout.addWidget(self.canny1_entry)
+        # self.canny1_label = qt.QLabel("Canny1")
+        # self.canny1_entry = qt.QLineEdit()
+        # self.canny1_entry.setText("50")
+        # layout.addWidget(self.canny1_label)
+        # layout.addWidget(self.canny1_entry)
 
-        self.canny2_label = qt.QLabel("Canny2")
-        self.canny2_entry = qt.QLineEdit()
-        self.canny2_entry.setText("150")
-        layout.addWidget(self.canny2_label)
-        layout.addWidget(self.canny2_entry)
+        # self.canny2_label = qt.QLabel("Canny2")
+        # self.canny2_entry = qt.QLineEdit()
+        # self.canny2_entry.setText("150")
+        # layout.addWidget(self.canny2_label)
+        # layout.addWidget(self.canny2_entry)
+
+        self.blue_label = qt.QLabel("Blue Threshold")
+        self.blue_entry = qt.QLineEdit()
+        self.blue_entry.setText("150")
+        layout.addWidget(self.blue_label)
+        layout.addWidget(self.blue_entry)
 
         self.blur_size_label = qt.QLabel("Blur Size")
         self.blur_size_entry = qt.QLineEdit()
@@ -202,20 +208,25 @@ class AnalysisApp(qt.QWidget):
         self.rectI=None
         
     def update_frame(self, frame):
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # OpenCV uses BGR, PyQt5 uses RGB
-        h, w, ch = frame.shape
-        bytes_per_line = ch * w
-        qt_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
-        pixmap = QPixmap.fromImage(qt_image)
-        
-        scaled_pixmap = pixmap.scaled(self.a_right_layout.size(), Qt.KeepAspectRatio)
-        self.scale_factor = self.a_right_layout.width() / w
+        f = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # OpenCV uses BGR, PyQt5 uses RGB
 
-        self.rectI.keepWithin.w = int(self.a_right_layout.width()/self.scale_factor)
-        self.rectI.keepWithin.h = int(self.a_right_layout.height()/self.scale_factor)
-        
-        self.a_right_layout.setPixmap(scaled_pixmap)
+       
+        out = cv2.resize(f, (0, 0), fx=self.scale_factor, fy=self.scale_factor)
+       
+        h, w, ch = out.shape
+        bytes_per_line = ch * w
+        qt_image = QImage(out.data, w, h, bytes_per_line, QImage.Format_RGB888)
+        pixmap = QPixmap.fromImage(qt_image)
+
+        # Update the layout with the pixmap
+        self.a_right_layout.setPixmap(pixmap)
+
+        # Update the dimensions of the selection rectangle
+        self.rectI.keepWithin.w = int(self.a_right_layout.width() / self.scale_factor)
+        self.rectI.keepWithin.h = int(self.a_right_layout.height() / self.scale_factor)
+
         self.a_right_layout.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+
     def start_analysis(self):
         print("start analysis")
         image_path=self.image_entry.text()
@@ -224,8 +235,8 @@ class AnalysisApp(qt.QWidget):
             self.issue.emit("Please enter a valid image path")
             return
         self.image=cv2.imread(image_path)
-        
-        self.rectI=selectinwindow.DragRectangle(self.image, self.wName, self.image.shape[0], self.image.shape[1])
+        self.scale_factor = min(self.a_right_layout.width() / self.image.shape[1], self.a_right_layout.height() / self.image.shape[0])
+        self.rectI=selectinwindow_v4.DragRectangle(self.image, self.wName, self.image.shape[0], self.image.shape[1])
     
         self.rectI.new_angle.connect(self.update_angles)
         self.rectI.new_frame.connect(self.update_frame)
@@ -236,6 +247,7 @@ class AnalysisApp(qt.QWidget):
         self.update_frame(self.rectI.image)
     
         self.start_stop_button.setText("Stop")
+        self.rectI.update_param()
 
     def print_event(self,str):
         print(str)
@@ -245,7 +257,7 @@ class AnalysisApp(qt.QWidget):
             x = int(x/self.scale_factor)
             y = int(y/self.scale_factor)
             if self.rectI is not None:
-                selectinwindow.dragrect(event,x,y, self.rectI)
+                selectinwindow_v4.dragrect(event,x,y, self.rectI)
             return super().event(event)
         return super().event(event)
     def stop_analysis(self):
@@ -276,11 +288,13 @@ class AnalysisApp(qt.QWidget):
 
     def cv_param_changed(self):
         if self.rectI is not None:
-            self.rectI.canny1=int(self.canny1_entry.text())
-            self.rectI.canny2=int(self.canny2_entry.text())
+            # self.rectI.canny1=int(self.canny1_entry.text())
+            # self.rectI.canny2=int(self.canny2_entry.text())
             self.rectI.blur_size=int(self.blur_size_entry.text())
             self.rectI.apertureSize=int(self.aperture_size_entry.text())
             self.rectI.L2gradient=self.L2gradient.isChecked()
+            self.rectI.blue_thresh=int(self.blue_entry.text())
+            self.rectI.update_param()
             
     def handle_tab_change(self, index):
         if index == 0 :

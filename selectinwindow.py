@@ -83,7 +83,7 @@ class DragRectangle(QObject):
     def __init__(self, Img, windowName, windowWidth, windowHeight):
         # Image
         super().__init__()
-        self.og_img = Img
+
         self.image = Img
         self.tmp = Img.copy()
 
@@ -98,6 +98,9 @@ class DragRectangle(QObject):
         self.blur_size = 7
         self.apertureSize = 3 
         self.L2gradient = False
+        self.blue_thresh = 150
+        self.edges=[]
+        self.contours=[]
 
         # Limit the selection box to the canvas
         self.keepWithin.x = 0
@@ -110,6 +113,9 @@ class DragRectangle(QObject):
         self.outRect.y = 0
         self.outRect.w = 0
         self.outRect.h = 0
+        
+    def update_param(self):
+        analyze_one_img_v4.edge_detection(self.image,self)
 
 
 def dragrect(event, x, y, dragObj):
@@ -316,7 +322,7 @@ def clearCanvasNDraw(dragObj):
     # Draw
     tmp = dragObj.image.copy()
     try:
-        a_l,a_r=analyze_one_img.find_contact_angle(tmp,dragObj)
+        a_l,a_r=analyze_one_img_v4.find_contact_angle(tmp,dragObj)
         dragObj.a_l=a_l
         dragObj.a_r=a_r
         dragObj.new_angle.emit([a_l,a_r])
